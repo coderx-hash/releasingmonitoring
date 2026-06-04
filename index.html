@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium Dispatch Board | S.O. > D.O. > O.R. > Dispatch</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Premium Scrollbar */
+        .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Smooth Card Animations */
+        .task-card { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+        .task-card:hover { transform: translateY(-3px); box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); }
+
+        /* Alert Animations */
+        .payment-alert { animation: pulseBorder 2s infinite; }
+        @keyframes pulseBorder {
+            0% { border-color: rgba(239, 68, 68, 0.3); }
+            50% { border-color: rgba(239, 68, 68, 0.8); }
+            100% { border-color: rgba(239, 68, 68, 0.3); }
+        }
+
+        .rejected-alert { animation: pulseReject 1.5s infinite; }
+        @keyframes pulseReject {
+            0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
+            70% { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+        }
+
+        .bullet-details ul { list-style-type: disc; padding-left: 1.25rem; margin-top: 0.25rem; }
+        .bullet-details li { margin-bottom: 0.25rem; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 h-screen flex flex-col overflow-hidden selection:bg-blue-200">
+
+    <!-- Top Navigation -->
+    <nav class="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white shadow-lg p-3 z-20 shrink-0 border-b border-white/10">
+        <div class="max-w-[100vw] mx-auto flex flex-col md:flex-row justify-between items-center gap-3 px-2">
+            <h1 class="text-lg md:text-xl font-extrabold tracking-wide flex items-center">
+                <div class="bg-white/10 p-1.5 rounded-lg mr-3 shadow-inner backdrop-blur-sm border border-white/20">
+                    <i class="fa-solid fa-rocket text-yellow-400 drop-shadow-md"></i>
+                </div>
+                Pro Dispatch <span class="text-blue-300 font-medium ml-2 text-sm border-l border-blue-500/50 pl-2">S.O. &rarr; D.O. &rarr; O.R. &rarr; Dispatch</span>
+            </h1>
+            
+            <!-- View Mode Selector -->
+            <div class="flex items-center gap-2 bg-black/20 p-1.5 rounded-xl backdrop-blur-md border border-white/10">
+                <label class="text-[11px] font-bold text-blue-200 uppercase tracking-wider ml-2"><i class="fa-solid fa-eye mr-1"></i> Active View:</label>
+                <select id="viewSelector" onchange="changeBoardView()" class="bg-white text-blue-900 text-sm font-bold rounded-lg px-3 py-1 outline-none cursor-pointer shadow-sm">
+                    <option value="ALL">Show All Columns</option>
+                    <option value="NEW">1. S.O. Encoder View</option>
+                    <option value="DO_PROCESS">2. D.O. Processing View</option>
+                    <option value="FOR_OR">3. O.R. Processing View</option>
+                    <option value="DISPATCH">4. Rider Dispatch View</option>
+                </select>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Layout -->
+    <div class="flex-grow flex flex-col lg:flex-row p-3 gap-5 overflow-hidden max-w-[100vw]">
+        
+        <!-- Mobile Toggle Button for S.O. Form -->
+        <button onclick="toggleMobileForm()" class="lg:hidden w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-md flex justify-center items-center active:scale-95 transition-transform">
+            <i class="fa-solid fa-pen-to-square mr-2"></i> Create New S.O.
+        </button>
+
+        <!-- Left Sidebar: S.O. Form -->
+        <div id="soFormContainer" class="hidden lg:flex w-full lg:w-[380px] shrink-0 bg-white p-5 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200/60 flex-col relative z-10 overflow-y-auto custom-scroll max-h-[70vh] lg:max-h-full transition-all">
+            <h2 class="text-lg font-black border-b border-slate-100 pb-3 mb-4 text-slate-800 flex justify-between items-center">
+                <span><i class="fa-solid fa-file-circle-plus mr-2 text-blue-600"></i>New Sales Order</span>
+                <i class="fa-solid fa-xmark lg:hidden cursor-pointer text-slate-400 hover:text-red-500 bg-slate-100 rounded-full w-8 h-8 flex items-center justify-center transition-colors" onclick="toggleMobileForm()"></i>
+            </h2>
+            
+            <form id="addSoForm" onsubmit="addOrder(event)" class="flex flex-col gap-4 flex-grow">
+                
+                <!-- Processor & Patient -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 tracking-wide">Encoder Name</label>
+                        <input type="text" id="processorName" required class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none capitalize transition-all shadow-inner" placeholder="Your Name">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 tracking-wide">Patient Name</label>
+                        <input type="text" id="patientName" required class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none capitalize transition-all shadow-inner" placeholder="Full Name">
+                    </div>
+                </div>
+
+                <!-- SO Number & Mobile -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 tracking-wide">S.O. Number</label>
+                        <input type="text" id="soNum" required class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none uppercase font-black text-blue-700 placeholder-slate-400 transition-all shadow-inner" placeholder="SO-1001">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 tracking-wide">Mobile Number</label>
+                        <input type="tel" id="mobileNum" required class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-medium transition-all shadow-inner" placeholder="09XX-XXX-XXXX">
+                    </div>
+                </div>
+
+                <!-- Location -->
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 tracking-wide">Area / Location</label>
+                    <select id="locationSelect" required onchange="toggleNewLocation()" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none mb-1 transition-all cursor-pointer shadow-inner">
+                        <option value="" disabled selected>Select Delivery Area</option>
+                        <option value="Manila">Manila</option>
+                        <option value="Batangas">Batangas</option>
+                        <option value="Laguna">Laguna</option>
+                        <option value="Albay">Albay</option>
+                        <option value="ADD_NEW" class="font-bold text-blue-600 bg-blue-50">+ Add New Location</option>
+                    </select>
+                    <input type="text" id="customLocation" class="hidden w-full border border-blue-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-blue-50/50 transition-all mt-2" placeholder="Type new location...">
+                </div>
+
+                <!-- Details -->
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 tracking-wide">Order Items</label>
+                    <textarea id="details" required rows="3" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none custom-scroll transition-all resize-none shadow-inner" placeholder="1x Item A&#10;2x Item B"></textarea>
+                </div>
+
+                <!-- Payment Details Container -->
+                <div class="bg-slate-50/80 p-3 rounded-xl border border-slate-100 flex flex-col gap-3 shadow-sm">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 tracking-wide">Payment Status</label>
+                            <select id="payment" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white font-medium cursor-pointer">
+                                <option value="wala">Fully Paid</option>
+                                <option value="may_babayaran">May Babayaran</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 tracking-wide">Issue O.R.?</label>
+                            <select id="issueOR" class="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none bg-amber-50 font-bold cursor-pointer text-amber-800">
+                                <option value="NO">NO</option>
+                                <option value="YES">YES</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 tracking-wide">Item Amount</label>
+                            <div class="relative">
+                                <span class="absolute left-3 top-2 text-slate-400 font-bold text-sm">₱</span>
+                                <input type="number" step="0.01" id="paymentAmount" required class="w-full border border-slate-200 rounded-lg pl-7 pr-2 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white font-medium shadow-inner" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 tracking-wide">Delivery Charge</label>
+                            <div class="relative">
+                                <span class="absolute left-3 top-2 text-slate-400 font-bold text-sm">₱</span>
+                                <input type="number" step="0.01" id="deliveryCharge" class="w-full border border-slate-200 rounded-lg pl-7 pr-2 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white font-medium shadow-inner" placeholder="Blank for FREE">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-auto pt-2">
+                    <button type="submit" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.23)] active:scale-[0.98] text-sm flex justify-center items-center gap-2 tracking-wide">
+                        <i class="fa-solid fa-paper-plane"></i> Submit Order to Board
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Right Main: KANBAN BOARD -->
+        <div class="flex-grow flex gap-5 overflow-x-auto overflow-y-hidden custom-scroll pb-2 w-full" id="kanbanBoard">
+            
+            <!-- Column 1: S.O. Encoded -->
+            <div id="wrapper-NEW" class="flex flex-col shrink-0 w-full md:w-[320px] lg:w-[360px] bg-slate-200/40 rounded-2xl border border-slate-200/80 shadow-inner overflow-hidden h-full">
+                <div class="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-3.5 flex justify-between items-center shadow-md z-10 flex-wrap gap-2 border-b border-blue-900/50">
+                    <h3 class="font-black text-sm tracking-wide flex items-center"><i class="fa-solid fa-keyboard mr-2 text-blue-200"></i>1. S.O. Encoding</h3>
+                    <div class="flex gap-2 items-center">
+                        <select id="filter-NEW" onchange="renderBoard()" class="text-[10px] text-blue-900 bg-white/90 font-bold rounded-md px-2 py-1 outline-none cursor-pointer shadow-sm">
+                            <option value="ALL">All Areas</option>
+                        </select>
+                        <span id="count-NEW" class="bg-blue-900/80 text-white text-xs px-2.5 py-0.5 rounded-full font-bold shadow-inner border border-blue-700">0</span>
+                    </div>
+                </div>
+                <div class="p-3 flex-grow overflow-y-auto custom-scroll flex flex-col gap-4" id="col-NEW"></div>
+            </div>
+
+            <!-- Column 2: D.O. Processing -->
+            <div id="wrapper-DO_PROCESS" class="flex flex-col shrink-0 w-full md:w-[320px] lg:w-[360px] bg-slate-200/40 rounded-2xl border border-slate-200/80 shadow-inner overflow-hidden h-full">
+                <div class="bg-gradient-to-r from-purple-600 to-indigo-700 text-white p-3.5 flex justify-between items-center shadow-md z-10 flex-wrap gap-2 border-b border-indigo-900/50">
+                    <h3 class="font-black text-sm tracking-wide flex items-center"><i class="fa-solid fa-box-open mr-2 text-purple-200"></i>2. D.O. Processing</h3>
+                    <div class="flex gap-2 items-center">
+                        <select id="filter-DO_PROCESS" onchange="renderBoard()" class="text-[10px] text-purple-900 bg-white/90 font-bold rounded-md px-2 py-1 outline-none cursor-pointer shadow-sm">
+                            <option value="ALL">All Areas</option>
+                        </select>
+                        <span id="count-DO_PROCESS" class="bg-indigo-900/80 text-white text-xs px-2.5 py-0.5 rounded-full font-bold shadow-inner border border-indigo-700">0</span>
+                    </div>
+                </div>
+                <div class="p-3 flex-grow overflow-y-auto custom-scroll flex flex-col gap-4" id="col-DO_PROCESS"></div>
+            </div>
+
+            <!-- Column 3: O.R. Processing -->
+            <div id="wrapper-FOR_OR" class="flex flex-col shrink-0 w-full md:w-[320px] lg:w-[360px] bg-slate-200/40 rounded-2xl border border-slate-200/80 shadow-inner overflow-hidden h-full">
+                <div class="bg-gradient-to-r from-amber-500 to-orange-600 text-white p-3.5 flex justify-between items-center shadow-md z-10 flex-wrap gap-2 border-b border-orange-700/50">
+                    <h3 class="font-black text-sm tracking-wide flex items-center"><i class="fa-solid fa-receipt mr-2 text-amber-100"></i>3. For O.R.</h3>
+                    <div class="flex gap-2 items-center">
+                        <select id="filter-FOR_OR" onchange="renderBoard()" class="text-[10px] text-amber-900 bg-white/90 font-bold rounded-md px-2 py-1 outline-none cursor-pointer shadow-sm">
+                            <option value="ALL">All Areas</option>
+                        </select>
+                        <span id="count-FOR_OR" class="bg-orange-800/80 text-white text-xs px-2.5 py-0.5 rounded-full font-bold shadow-inner border border-orange-700">0</span>
+                    </div>
+                </div>
+                <div class="p-3 flex-grow overflow-y-auto custom-scroll flex flex-col gap-4" id="col-FOR_OR"></div>
+            </div>
+
+            <!-- Column 4: Rider Dispatch -->
+            <div id="wrapper-DISPATCH" class="flex flex-col shrink-0 w-full md:w-[320px] lg:w-[360px] bg-slate-200/40 rounded-2xl border border-slate-200/80 shadow-inner overflow-hidden h-full">
+                <div class="bg-gradient-to-r from-emerald-600 to-teal-800 text-white p-3.5 flex justify-between items-center shadow-md z-10 flex-wrap gap-2 border-b border-teal-900/50">
+                    <h3 class="font-black text-sm tracking-wide flex items-center"><i class="fa-solid fa-motorcycle mr-2 text-teal-200"></i>4. Rider Dispatch</h3>
+                    <div class="flex gap-2 items-center">
+                        <select id="filter-DISPATCH" onchange="renderBoard()" class="text-[10px] text-emerald-900 bg-white/90 font-bold rounded-md px-2 py-1 outline-none cursor-pointer shadow-sm">
+                            <option value="ALL">All Areas</option>
+                        </select>
+                        <span id="count-DISPATCH" class="bg-emerald-900/80 text-white text-xs px-2.5 py-0.5 rounded-full font-bold shadow-inner border border-emerald-800">0</span>
+                    </div>
+                </div>
+                <div class="p-3 flex-grow overflow-y-auto custom-scroll flex flex-col gap-4" id="col-DISPATCH"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- MODALS -->
+
+    <!-- 1. Input D.O. Number Modal -->
+    <div id="doModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
+        <div class="bg-white w-full max-w-sm p-6 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] transform transition-transform scale-100 border border-slate-100">
+            <h3 class="text-lg font-black mb-4 text-purple-900 border-b border-slate-100 pb-3 flex items-center"><i class="fa-solid fa-box-open mr-2 text-purple-600"></i> Input D.O. Number</h3>
+            <input type="hidden" id="doModalOrderId">
+            <div class="mb-4">
+                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-2 tracking-wide">Delivery Order No.</label>
+                <input type="text" id="modalDoNum" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none uppercase font-black tracking-widest text-center shadow-inner" placeholder="e.g. DO-12345">
+            </div>
+            <div class="flex flex-col gap-2 mt-2">
+                <button onclick="submitDO()" class="w-full bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-bold py-3 rounded-xl shadow-md transition-all text-sm flex items-center justify-center">
+                    <i class="fa-solid fa-share mr-2"></i> Submit to D.O. Processing
+                </button>
+                <button onclick="closeModals()" class="w-full bg-transparent hover:bg-slate-100 text-slate-500 font-bold py-2 rounded-xl mt-1 text-sm transition-colors">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Review & Invoice Modal -->
+    <div id="reviewModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
+        <div class="bg-white w-full max-w-sm p-6 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] transform transition-transform scale-100 border border-slate-100">
+            <h3 class="text-lg font-black mb-4 text-slate-800 border-b border-slate-100 pb-3 flex items-center"><i class="fa-solid fa-file-invoice-dollar mr-2 text-slate-600"></i> Review Order</h3>
+            <input type="hidden" id="reviewModalOrderId">
+            
+            <p class="text-[12px] text-slate-500 font-medium mb-4 text-center">Is the transaction OK? If yes, input Invoice number. If no, click Return to Encoder.</p>
+            
+            <div class="mb-6 bg-slate-50 p-3 rounded-xl border border-slate-200 shadow-inner">
+                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-2 tracking-wide text-center">Invoice No. (If OK)</label>
+                <input type="text" id="modalInvNum" class="w-full border border-slate-300 rounded-lg px-4 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none uppercase font-black tracking-widest text-center" placeholder="INV-000">
+            </div>
+            
+            <div class="flex flex-col gap-3">
+                <button onclick="submitInvoice()" class="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold py-3 rounded-xl shadow-md transition-all text-sm flex items-center justify-center">
+                    <i class="fa-solid fa-check-circle mr-2"></i> Transaction OK (Forward)
+                </button>
+                <div class="flex items-center gap-2">
+                    <div class="h-px bg-slate-200 flex-grow"></div>
+                    <span class="text-[10px] text-slate-400 font-bold uppercase">OR</span>
+                    <div class="h-px bg-slate-200 flex-grow"></div>
+                </div>
+                <button onclick="openRejectModal()" class="w-full bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 font-bold py-3 rounded-xl transition-all text-sm flex items-center justify-center">
+                    <i class="fa-solid fa-triangle-exclamation mr-2"></i> Return to Encoder (Error)
+                </button>
+                <button onclick="closeModals()" class="w-full bg-transparent hover:bg-slate-100 text-slate-500 font-bold py-2 rounded-xl mt-1 text-sm transition-colors">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Reject / Return Modal (NEW) -->
+    <div id="rejectModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
+        <div class="bg-white w-full max-w-sm p-6 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] transform transition-transform scale-100 border-t-4 border-red-500">
+            <h3 class="text-lg font-black mb-4 text-red-700 border-b border-slate-100 pb-3 flex items-center"><i class="fa-solid fa-backward mr-2"></i> Return to S.O. Encoder</h3>
+            
+            <div class="mb-5">
+                <label class="block text-[11px] font-bold text-slate-600 uppercase mb-2 tracking-wide">Reason for Return / Remarks</label>
+                <textarea id="rejectRemarks" rows="3" class="w-full bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-red-500 outline-none resize-none placeholder-red-300" placeholder="E.g., Mali yung amount, paki-update ang address..."></textarea>
+            </div>
+            
+            <div class="flex flex-col gap-2">
+                <button onclick="submitReject()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl shadow-md transition-all text-sm flex items-center justify-center">
+                    <i class="fa-solid fa-paper-plane mr-2"></i> Send Back to Encoder
+                </button>
+                <button onclick="closeModals()" class="w-full bg-transparent hover:bg-slate-100 text-slate-500 font-bold py-2 rounded-xl mt-1 text-sm transition-colors">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Edit Order Modal (For Encoders) -->
+    <div id="editModal" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-md flex items-center justify-center z-50 p-4 transition-opacity">
+        <div class="bg-white w-full max-w-md p-6 rounded-2xl shadow-2xl overflow-y-auto max-h-[90vh] custom-scroll border border-slate-200">
+            <h3 class="text-lg font-black border-b border-slate-100 pb-3 mb-4 text-red-600 flex justify-between items-center">
+                <span><i class="fa-solid fa-pen-to-square mr-2"></i>Edit & Fix Transaction</span>
+                <i class="fa-solid fa-xmark cursor-pointer text-slate-400 hover:text-red-500" onclick="closeModals()"></i>
+            </h3>
+            
+            <form id="editSoForm" onsubmit="saveEditOrder(event)" class="flex flex-col gap-4">
+                <input type="hidden" id="editOrderId">
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 tracking-wide">Patient Name</label>
+                        <input type="text" id="editPatientName" required class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none capitalize">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 tracking-wide">Mobile Number</label>
+                        <input type="tel" id="editMobileNum" required class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none font-medium">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 tracking-wide">Order Items</label>
+                    <textarea id="editDetails" required rows="3" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none custom-scroll resize-none"></textarea>
+                </div>
+
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 flex flex-col gap-3 shadow-inner">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 tracking-wide">Payment Status</label>
+                            <select id="editPayment" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white font-medium cursor-pointer">
+                                <option value="wala">Fully Paid</option>
+                                <option value="may_babayaran">May Babayaran</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 tracking-wide">Issue O.R.?</label>
+                            <select id="editIssueOR" class="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none bg-amber-50 font-bold cursor-pointer text-amber-800">
+                                <option value="NO">NO</option>
+                                <option value="YES">YES</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 tracking-wide">Item Amount</label>
+                            <input type="number" step="0.01" id="editPaymentAmount" required class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white font-medium">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 tracking-wide">Delivery Charge</label>
+                            <input type="text" id="editDeliveryCharge" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white font-medium">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-2 flex gap-2">
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] text-sm transition-all">
+                        <i class="fa-solid fa-save mr-2"></i> Save & Resubmit
+                    </button>
+                    <button type="button" onclick="closeModals()" class="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3.5 rounded-xl text-sm transition-all">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 5. Input O.R. Number Modal -->
+    <div id="orModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
+        <div class="bg-white w-full max-w-sm p-6 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] transform transition-transform scale-100 border border-slate-100">
+            <h3 class="text-lg font-black mb-4 text-amber-900 border-b border-slate-100 pb-3 flex items-center"><i class="fa-solid fa-receipt mr-2 text-amber-600"></i> Input O.R. Number</h3>
+            <input type="hidden" id="orModalOrderId">
+            <div class="mb-4">
+                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-2 tracking-wide">Official Receipt No.</label>
+                <input type="text" id="modalOrNum" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none uppercase font-black tracking-widest text-center shadow-inner" placeholder="e.g. OR-12345">
+            </div>
+            <div class="flex flex-col gap-2 mt-2">
+                <button onclick="submitOR()" class="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold py-3 rounded-xl shadow-md transition-all text-sm flex items-center justify-center">
+                    <i class="fa-solid fa-motorcycle mr-2"></i> Submit & Forward to Dispatch
+                </button>
+                <button onclick="closeModals()" class="w-full bg-transparent hover:bg-slate-100 text-slate-500 font-bold py-2 rounded-xl mt-1 text-sm transition-colors">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. Update Rider Status Modal -->
+    <div id="riderModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
+        <div class="bg-white w-full max-w-sm p-6 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] transform transition-transform scale-100 border border-slate-100">
+            <h3 class="text-lg font-black mb-4 text-emerald-900 border-b border-slate-100 pb-3 flex items-center"><i class="fa-solid fa-motorcycle mr-2 text-emerald-600"></i> Update Rider Status</h3>
+            <input type="hidden" id="riderModalOrderId">
+            <div class="flex flex-col gap-3 mt-4">
+                <button onclick="submitRiderStatus('WAREHOUSE')" class="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-3.5 rounded-xl border border-indigo-200 transition-colors text-sm flex items-center justify-center">
+                    <i class="fa-solid fa-warehouse mr-2"></i> Nasa Warehouse Pa
+                </button>
+                <button onclick="submitRiderStatus('DELIVERING')" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3.5 rounded-xl shadow-md transition-colors text-sm flex items-center justify-center">
+                    <i class="fa-solid fa-truck-fast mr-2"></i> I-dedeliver Na
+                </button>
+                <div class="border-t my-2 border-slate-100"></div>
+                <button onclick="submitRiderStatus('DELIVERED')" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 rounded-xl shadow-lg transition-colors text-sm flex items-center justify-center">
+                    <i class="fa-solid fa-check-double mr-2 text-emerald-400"></i> Na-deliver Na (Finish)
+                </button>
+                <button onclick="closeModals()" class="w-full bg-transparent hover:bg-slate-100 text-slate-500 font-bold py-2 rounded-xl mt-1 text-sm transition-colors">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        let orders = [];
+        let currentId = 1;
+        let locations = new Set(["Manila", "Batangas", "Laguna", "Albay"]);
+
+        // UI Forms Toggle
+        function toggleMobileForm() {
+            const form = document.getElementById('soFormContainer');
+            form.classList.toggle('hidden');
+            form.classList.toggle('flex');
+        }
+
+        function toggleNewLocation() {
+            const select = document.getElementById('locationSelect');
+            const customInput = document.getElementById('customLocation');
+            if (select.value === 'ADD_NEW') {
+                customInput.classList.remove('hidden'); customInput.required = true;
+            } else {
+                customInput.classList.add('hidden'); customInput.required = false;
+            }
+        }
+
+        // View Management (Tab Selection)
+        function changeBoardView() {
+            const view = document.getElementById('viewSelector').value;
+            const columns = ['NEW', 'DO_PROCESS', 'FOR_OR', 'DISPATCH'];
+            
+            columns.forEach(col => {
+                const wrapper = document.getElementById(`wrapper-${col}`);
+                if (view === 'ALL' || view === col) {
+                    wrapper.classList.remove('hidden');
+                    wrapper.classList.add('flex');
+                } else {
+                    wrapper.classList.remove('flex');
+                    wrapper.classList.add('hidden');
+                }
+            });
+        }
+
+        // Format Utilities
+        const formatMoney = (amount) => parseFloat(amount).toLocaleString('en-PH', { style: 'currency', currency: 'PHP' });
+        const getTimestamp = () => {
+            const now = new Date();
+            return now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) + ' - ' + now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        };
+
+        // Update Location Dropdowns in Columns
+        function updateColumnFilters() {
+            const columns = ['NEW', 'DO_PROCESS', 'FOR_OR', 'DISPATCH'];
+            columns.forEach(col => {
+                const select = document.getElementById(`filter-${col}`);
+                const currentValue = select.value;
+                select.innerHTML = `<option value="ALL">All Areas</option>`;
+                locations.forEach(loc => {
+                    select.add(new Option(loc, loc));
+                });
+                select.value = currentValue || 'ALL'; 
+            });
+        }
+
+        // Create S.O.
+        function addOrder(e) {
+            e.preventDefault();
+            
+            const processorName = document.getElementById('processorName').value.trim();
+            const patientName = document.getElementById('patientName').value.trim();
+            const soNum = document.getElementById('soNum').value.toUpperCase();
+            const mobileNum = document.getElementById('mobileNum').value;
+            const issueOR = document.getElementById('issueOR').value;
+            const timestamp = getTimestamp();
+            
+            let location = document.getElementById('locationSelect').value;
+            if (location === 'ADD_NEW') {
+                location = document.getElementById('customLocation').value;
+                location = location.charAt(0).toUpperCase() + location.slice(1).toLowerCase();
+                locations.add(location);
+                
+                const select = document.getElementById('locationSelect');
+                select.add(new Option(location, location), select.options[select.options.length - 1]);
+                select.value = location; 
+                toggleNewLocation();
+                updateColumnFilters();
+            } else {
+                location = location.charAt(0).toUpperCase() + location.slice(1).toLowerCase();
+            }
+            
+            const detailsRaw = document.getElementById('details').value;
+            const paymentType = document.getElementById('payment').value;
+            
+            const paymentAmount = document.getElementById('paymentAmount').value || 0;
+            const rawDeliveryCharge = document.getElementById('deliveryCharge').value;
+            const deliveryCharge = (rawDeliveryCharge === '' || parseFloat(rawDeliveryCharge) === 0) ? 'FREE' : parseFloat(rawDeliveryCharge);
+
+            orders.push({
+                id: currentId++,
+                processorName, timestamp, patientName, soNum, mobileNum, location, issueOR,
+                detailsRaw, paymentType, paymentAmount, deliveryCharge,
+                status: 'NEW', 
+                subStatus: '',
+                doNum: '',
+                invNum: '',
+                orNum: '',
+                isRejected: false,     // NEW: Rejection State
+                rejectRemarks: ''      // NEW: Reason for return
+            });
+
+            const currentProcessor = document.getElementById('processorName').value;
+            document.getElementById('addSoForm').reset();
+            document.getElementById('processorName').value = currentProcessor;
+            document.getElementById('issueOR').value = "NO"; 
+            
+            renderBoard();
+            if(window.innerWidth < 1024) toggleMobileForm();
+        }
+
+        // Render Board
+        function renderBoard() {
+            const columns = ['NEW', 'DO_PROCESS', 'FOR_OR', 'DISPATCH'];
+            
+            columns.forEach(col => {
+                document.getElementById(`col-${col}`).innerHTML = '';
+                document.getElementById(`count-${col}`).innerText = '0';
+            });
+
+            [...orders].reverse().forEach(order => {
+                let colId = order.status;
+                let targetCol = document.getElementById(`col-${colId}`);
+                let filterVal = document.getElementById(`filter-${colId}`).value;
+
+                if (filterVal !== 'ALL' && order.location !== filterVal) return;
+                
+                let countSpan = document.getElementById(`count-${colId}`);
+                countSpan.innerText = parseInt(countSpan.innerText) + 1;
+
+                const isMayBabayaran = order.paymentType === 'may_babayaran';
+                
+                // Styling base border
+                let cardBorder = 'border border-slate-200/80 shadow-sm';
+                if (order.isRejected && colId === 'NEW') {
+                    cardBorder = 'border-2 border-red-500 rejected-alert shadow-md'; // High alert for rejected
+                } else if (isMayBabayaran) {
+                    cardBorder = 'border-2 border-red-300 payment-alert shadow-md';
+                }
+                
+                let saleAmount = parseFloat(order.paymentAmount) || 0;
+                let delCharge = (order.deliveryCharge === 'FREE') ? 0 : parseFloat(order.deliveryCharge);
+                let totalAmount = saleAmount + delCharge;
+
+                const paymentModeBadge = isMayBabayaran 
+                    ? `<span class="bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wide shadow-sm"><i class="fa-solid fa-hand-holding-dollar mr-1"></i> To Collect</span>`
+                    : `<span class="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wide shadow-sm"><i class="fa-solid fa-check-circle mr-1"></i> Fully Paid</span>`;
+                
+                const orBadge = order.issueOR === 'YES' 
+                    ? `<span class="bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-black px-2 py-0.5 rounded-md tracking-wider uppercase shadow-sm"><i class="fa-solid fa-receipt mr-1"></i> Need O.R.</span>` 
+                    : ``;
+
+                const financialUI = `
+                    <div class="bg-slate-50/70 border border-slate-200/60 rounded-xl p-3 mb-3 text-[11px] shadow-inner">
+                        <div class="flex justify-between items-center mb-2 border-b border-slate-200/80 pb-2">
+                            <span class="font-bold text-slate-500 uppercase tracking-wide text-[10px]">Payment Status</span>
+                            <div class="flex gap-1.5">${paymentModeBadge} ${(colId !== 'DISPATCH') ? orBadge : ''}</div>
+                        </div>
+                        <div class="flex justify-between text-slate-600 mb-1">
+                            <span class="font-medium">Sale Amount:</span>
+                            <span class="font-bold text-slate-800">${formatMoney(saleAmount)}</span>
+                        </div>
+                        <div class="flex justify-between text-slate-600">
+                            <span class="font-medium">Delivery Charge:</span>
+                            <span class="font-bold text-slate-800">${order.deliveryCharge === 'FREE' ? '<span class="text-emerald-600 bg-emerald-100 px-1.5 rounded font-bold">FREE</span>' : formatMoney(delCharge)}</span>
+                        </div>
+                        <div class="flex justify-between items-center mt-2 pt-2 border-t border-slate-200/80">
+                            <span class="font-black uppercase text-[11px] text-slate-700">Total Amount:</span>
+                            <span class="font-black ${isMayBabayaran ? 'text-red-600 text-sm' : 'text-emerald-600 text-sm'}">${formatMoney(totalAmount)}</span>
+                        </div>
+                    </div>
+                `;
+
+                // Document Badges (D.O. & INV)
+                let docBadges = '';
+                if(order.doNum || order.invNum) {
+                    docBadges = `<div class="flex flex-wrap gap-2 text-[10px] mb-2 mt-1">`;
+                    if(order.doNum) docBadges += `<span class="bg-purple-100 text-purple-800 px-2 py-1 rounded-md font-bold border border-purple-200 shadow-sm"><i class="fa-solid fa-box-open mr-1"></i> D.O. #: ${order.doNum}</span>`;
+                    if(order.invNum) docBadges += `<span class="bg-indigo-100 text-indigo-800 px-2 py-1 rounded-md font-bold border border-indigo-200 shadow-sm"><i class="fa-solid fa-file-invoice mr-1"></i> INV #: ${order.invNum}</span>`;
+                    docBadges += `</div>`;
+                }
+
+                const bullets = `<ul class="text-[12px] text-slate-700 list-disc pl-5 font-medium">` + order.detailsRaw.split('\n').filter(l=>l.trim()!=='').map(l => `<li>${l}</li>`).join('') + `</ul>`;
+
+                let infoBadges = '';
+                let actionBtn = '';
+
+                // SMART ROUTING & COLUMN LOGIC
+                if (colId === 'NEW') {
+                    // Check if it's a rejected order
+                    if (order.isRejected) {
+                        infoBadges += `
+                            <div class="bg-red-50 border border-red-300 p-3 rounded-xl mb-3 shadow-inner">
+                                <div class="font-black uppercase text-[11px] tracking-wide flex items-center mb-1 text-red-600">
+                                    <i class="fa-solid fa-triangle-exclamation fa-fade mr-1.5 text-red-500"></i> Returned / Fix Required
+                                </div>
+                                <div class="text-xs font-medium text-red-900 border-l-2 border-red-400 pl-2 ml-1 italic">"${order.rejectRemarks}"</div>
+                            </div>
+                        `;
+                        actionBtn = `<button onclick="openEditModal(${order.id})" class="w-full mt-2 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl text-xs shadow-[0_4px_14px_0_rgba(220,38,38,0.39)] transition-all active:scale-[0.98]"><i class="fa-solid fa-pen-to-square mr-1.5"></i> Edit & Fix Order</button>`;
+                    } else {
+                        actionBtn = `<button onclick="openDOModal(${order.id})" class="w-full mt-2 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-bold py-3 rounded-xl text-xs shadow-[0_4px_14px_0_rgba(99,102,241,0.39)] transition-all active:scale-[0.98]"><i class="fa-solid fa-box-open mr-1.5"></i> Input D.O. & Process</button>`;
+                    }
+                }
+                else if (colId === 'DO_PROCESS') {
+                    actionBtn = `<button onclick="openReviewModal(${order.id})" class="w-full mt-2 bg-slate-800 hover:bg-black text-white font-bold py-3 rounded-xl text-xs shadow-md transition-all active:scale-[0.98]"><i class="fa-solid fa-file-invoice-dollar mr-1.5"></i> Review & Invoice Order</button>`;
+                }
+                else if (colId === 'FOR_OR') {
+                    infoBadges += `<div class="text-[11px] bg-amber-50/80 text-amber-900 p-3 rounded-xl mt-2 border border-amber-200/80 shadow-inner mb-3">
+                                    <div class="flex justify-between font-bold">
+                                        <span class="text-amber-700 uppercase text-[10px] tracking-wider">O.R. Amount to Issue:</span> 
+                                        <span class="text-slate-800 text-sm">${formatMoney(totalAmount)}</span>
+                                    </div>
+                                   </div>`;
+                    actionBtn = `<button onclick="openORModal(${order.id})" class="w-full mt-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold py-3 rounded-xl text-xs shadow-md transition-all active:scale-[0.98]"><i class="fa-solid fa-keyboard mr-1.5"></i> Input O.R. # & Dispatch</button>`;
+                }
+                else if (colId === 'DISPATCH') {
+                    // HUGE O.R. BANNER FOR RIDERS
+                    let orStatusBanner = order.issueOR === 'YES'
+                        ? `<div class="bg-amber-100 border-2 border-amber-400 text-amber-900 font-black text-[13px] text-center py-2.5 rounded-xl mb-3 shadow-sm flex flex-col gap-1 tracking-wide uppercase">
+                            <span><i class="fa-solid fa-receipt text-amber-600 mr-1.5"></i> NEED O.R.</span>
+                            <span class="bg-white mx-4 py-1.5 rounded-lg border border-amber-300 text-amber-800 text-xs shadow-inner">O.R. #: ${order.orNum}</span>
+                           </div>`
+                        : `<div class="bg-slate-100 border-2 border-slate-300 text-slate-600 font-black text-[13px] text-center py-2.5 rounded-xl mb-3 uppercase tracking-wide shadow-sm"><i class="fa-solid fa-xmark text-slate-400 mr-1.5"></i> NO NEED O.R.</div>`;
+                    
+                    infoBadges += orStatusBanner; 
+
+                    let riderBadge = order.subStatus === 'WAREHOUSE' 
+                        ? `<span class="flex items-center justify-center bg-indigo-50 text-indigo-700 text-[11px] font-bold py-2 mt-2 rounded-xl border border-indigo-200"><i class="fa-solid fa-warehouse mr-2"></i> Nasa Warehouse Pa</span>`
+                        : (order.subStatus === 'DELIVERING' ? `<span class="flex items-center justify-center bg-blue-500 text-white text-[11px] font-bold py-2 mt-2 rounded-xl shadow"><i class="fa-solid fa-motorcycle fa-fade mr-2"></i> I-dedeliver Na</span>` : '');
+
+                    infoBadges += riderBadge;
+                    actionBtn = `<button onclick="openRiderModal(${order.id})" class="w-full mt-3 bg-white hover:bg-slate-50 text-slate-700 font-bold py-3 rounded-xl text-xs border border-slate-300 shadow-sm transition-all active:scale-[0.98]"><i class="fa-solid fa-pen-to-square mr-1"></i> Update Rider Status</button>`;
+                }
+
+                targetCol.innerHTML += `
+                    <div class="task-card bg-white rounded-2xl p-4 ${cardBorder} flex flex-col shrink-0">
+                        
+                        <div class="flex justify-between items-center text-[10px] text-slate-400 mb-2 border-b border-slate-100 pb-2">
+                            <span class="font-semibold"><i class="fa-regular fa-clock mr-1"></i> ${order.timestamp}</span>
+                            <span class="capitalize bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full font-bold shadow-sm"><i class="fa-solid fa-user-pen mr-1"></i> ${order.processorName}</span>
+                        </div>
+                        
+                        <div class="flex justify-between items-start mb-1 mt-1">
+                            <div>
+                                <h3 class="font-black text-slate-800 text-xl leading-none tracking-tight">${order.soNum}</h3>
+                                <p class="text-xs font-bold text-slate-600 mt-1.5 capitalize"><i class="fa-solid fa-user-injured mr-1.5 text-slate-400"></i>${order.patientName}</p>
+                            </div>
+                            <span class="bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold px-2 py-1 rounded-lg flex items-center shadow-sm"><i class="fa-solid fa-location-dot mr-1"></i> ${order.location}</span>
+                        </div>
+                        
+                        ${docBadges}
+
+                        <div class="mb-3 mt-1 bg-slate-50/50 p-2 rounded-xl border border-slate-100 flex items-center justify-between group hover:bg-slate-100 transition-colors">
+                            <span class="text-[10px] text-slate-500 uppercase font-bold tracking-wide">Contact</span>
+                            <a href="tel:${order.mobileNum}" class="text-sm font-black text-blue-600 group-hover:text-blue-800 transition-colors"><i class="fa-solid fa-phone mr-1"></i> ${order.mobileNum}</a>
+                        </div>
+                        
+                        ${financialUI}
+
+                        <div class="bg-slate-50/50 border border-slate-100 rounded-xl p-3 flex-grow mb-3 shadow-inner">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase block mb-1.5 tracking-wide">Order Items</span>
+                            ${bullets}
+                        </div>
+                        
+                        ${infoBadges}
+                        ${actionBtn}
+                    </div>
+                `;
+            });
+        }
+
+        // --- MODAL CONTROLS & LOGIC ---
+
+        // D.O. Modal
+        function openDOModal(id) {
+            document.getElementById('doModalOrderId').value = id;
+            document.getElementById('modalDoNum').value = '';
+            document.getElementById('doModal').classList.remove('hidden');
+        }
+
+        function submitDO() {
+            const id = parseInt(document.getElementById('doModalOrderId').value);
+            const doNum = document.getElementById('modalDoNum').value.trim();
+            
+            if(!doNum) return alert("Please input the Delivery Order Number!");
+
+            let order = orders.find(o => o.id === id);
+            if(order) { 
+                order.doNum = doNum.toUpperCase();
+                order.status = 'DO_PROCESS'; 
+                renderBoard(); 
+                closeModals();
+            }
+        }
+
+        // Review Modal
+        function openReviewModal(id) {
+            document.getElementById('reviewModalOrderId').value = id;
+            document.getElementById('modalInvNum').value = '';
+            document.getElementById('reviewModal').classList.remove('hidden');
+        }
+
+        function submitInvoice() {
+            const id = parseInt(document.getElementById('reviewModalOrderId').value);
+            const invNum = document.getElementById('modalInvNum').value.trim();
+            
+            if(!invNum) return alert("Please input the Invoice Number if the transaction is OK.");
+
+            let order = orders.find(o => o.id === id);
+            if(order) { 
+                order.invNum = invNum.toUpperCase();
+                // Route smartly based on Issue O.R. setting
+                if(order.issueOR === 'YES') {
+                    order.status = 'FOR_OR';
+                } else {
+                    order.status = 'DISPATCH';
+                    order.subStatus = 'WAREHOUSE';
+                }
+                renderBoard(); 
+                closeModals();
+            }
+        }
+
+        // REJECT MODAL LOGIC (Returning to Encoder)
+        function openRejectModal() {
+            // Get ID from the review modal
+            const id = document.getElementById('reviewModalOrderId').value;
+            
+            // Hide review modal, show reject modal
+            document.getElementById('reviewModal').classList.add('hidden');
+            
+            document.getElementById('rejectRemarks').value = '';
+            // Store ID in a temporary global variable or just rely on the existing hidden input if shared, 
+            // but let's use the reviewModalOrderId directly since it's already set.
+            document.getElementById('rejectModal').classList.remove('hidden');
+        }
+
+        function submitReject() {
+            const id = parseInt(document.getElementById('reviewModalOrderId').value);
+            const remarks = document.getElementById('rejectRemarks').value.trim();
+
+            if(!remarks) return alert("Please provide a reason or remarks for returning the S.O.");
+
+            let order = orders.find(o => o.id === id);
+            if(order) {
+                order.status = 'NEW';
+                order.isRejected = true;
+                order.rejectRemarks = remarks;
+                renderBoard();
+                closeModals();
+            }
+        }
+
+        // EDIT MODAL LOGIC (For Encoder fixing returned orders)
+        function openEditModal(id) {
+            let order = orders.find(o => o.id === id);
+            
+            if(order) {
+                document.getElementById('editOrderId').value = order.id;
+                document.getElementById('editPatientName').value = order.patientName;
+                document.getElementById('editMobileNum').value = order.mobileNum;
+                document.getElementById('editDetails').value = order.detailsRaw;
+                document.getElementById('editPayment').value = order.paymentType;
+                document.getElementById('editIssueOR').value = order.issueOR;
+                document.getElementById('editPaymentAmount').value = order.paymentAmount;
+                document.getElementById('editDeliveryCharge').value = order.deliveryCharge === 'FREE' ? '' : order.deliveryCharge;
+                
+                document.getElementById('editModal').classList.remove('hidden');
+            }
+        }
+
+        function saveEditOrder(e) {
+            e.preventDefault();
+            const id = parseInt(document.getElementById('editOrderId').value);
+            let order = orders.find(o => o.id === id);
+            
+            if(order) {
+                order.patientName = document.getElementById('editPatientName').value.trim();
+                order.mobileNum = document.getElementById('editMobileNum').value.trim();
+                order.detailsRaw = document.getElementById('editDetails').value;
+                order.paymentType = document.getElementById('editPayment').value;
+                order.issueOR = document.getElementById('editIssueOR').value;
+                order.paymentAmount = document.getElementById('editPaymentAmount').value || 0;
+                
+                const rawDeliveryCharge = document.getElementById('editDeliveryCharge').value;
+                order.deliveryCharge = (rawDeliveryCharge === '' || parseFloat(rawDeliveryCharge) === 0) ? 'FREE' : parseFloat(rawDeliveryCharge);
+                
+                // Remove Rejection Status
+                order.isRejected = false;
+                order.rejectRemarks = '';
+                
+                renderBoard();
+                closeModals();
+            }
+        }
+
+        // O.R. Modal
+        function openORModal(id) {
+            document.getElementById('orModalOrderId').value = id;
+            document.getElementById('modalOrNum').value = '';
+            document.getElementById('orModal').classList.remove('hidden');
+        }
+
+        function submitOR() {
+            const id = parseInt(document.getElementById('orModalOrderId').value);
+            const orNum = document.getElementById('modalOrNum').value.trim();
+            
+            if(!orNum) return alert("Please input the Official Receipt Number!");
+
+            let order = orders.find(o => o.id === id);
+            if(order) { 
+                order.orNum = orNum.toUpperCase();
+                order.status = 'DISPATCH'; 
+                order.subStatus = 'WAREHOUSE';
+                renderBoard(); 
+                closeModals();
+            }
+        }
+
+        // Rider Modal
+        function openRiderModal(id) {
+            document.getElementById('riderModalOrderId').value = id;
+            document.getElementById('riderModal').classList.remove('hidden');
+        }
+
+        function submitRiderStatus(status) {
+            const id = parseInt(document.getElementById('riderModalOrderId').value);
+            if (status === 'DELIVERED') {
+                if(confirm("Mark as Delivered? Ireremove na nito yung S.O. sa board.")) {
+                    orders = orders.filter(o => o.id !== id);
+                }
+            } else {
+                let order = orders.find(o => o.id === id);
+                if(order) order.subStatus = status;
+            }
+            renderBoard(); 
+            closeModals();
+        }
+
+        function closeModals() {
+            document.getElementById('doModal').classList.add('hidden');
+            document.getElementById('reviewModal').classList.add('hidden');
+            document.getElementById('rejectModal').classList.add('hidden');
+            document.getElementById('editModal').classList.add('hidden');
+            document.getElementById('orModal').classList.add('hidden');
+            document.getElementById('riderModal').classList.add('hidden');
+        }
+
+        // Init Setup
+        updateColumnFilters();
+        renderBoard();
+    </script>
+</body>
+</html>
